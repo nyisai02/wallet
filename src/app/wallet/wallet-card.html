@@ -1,0 +1,22 @@
+<div class="relative isolate overflow-hidden rounded-2xl bg-[#172e63] p-4 text-white shadow-lg shadow-blue-950/10 sm:p-5"
+     [class.grayscale]="frozen()">
+  <div class="pointer-events-none absolute -top-25 -right-20 -z-10 size-65 rounded-full border-28 border-white/8"></div>
+  <div class="flex items-center justify-between gap-2">
+    <span class="flex items-center gap-2 text-sm font-semibold"><svg lucideIcon="landmark" [size]="17" aria-hidden="true" /> MyBank</span>
+    <span class="text-[0.65rem] tracking-[0.22em] text-blue-100">PREMIUM</span>
+  </div>
+  <div class="my-4 flex items-center gap-2">
+    <span class="h-6 w-8 rounded-md border border-amber-200 bg-linear-to-br from-amber-100 to-amber-500"></span>
+    <svg lucideIcon="wifi" [size]="20" class="rotate-90 text-blue-100" aria-hidden="true" />
+  </div>
+  <p class="text-[0.95rem] tracking-[0.18em]">•••• •••• •••• {{ account.cardSuffix }}</p>
+  <div class="mt-4 flex items-end justify-between">
+    <div><p class="text-[0.57rem] tracking-widest text-blue-200">CARD HOLDER</p><p class="text-[0.65rem] tracking-widest uppercase">{{ account.name }}</p></div>
+    <span class="flex -space-x-2" aria-hidden="true"><span class="size-6 rounded-full bg-[#ec694f]"></span><span class="size-6 rounded-full bg-[#f5b246]/90"></span></span>
+  </div>
+  @if (frozen()) {
+    <div class="absolute inset-0 grid place-items-center bg-slate-950/65">
+      <span class="flex items-center gap-2 font-semibold"><svg lucideIcon="snowflake" [size]="18" aria-hidden="true" /> Card frozen</span>
+    </div>
+  }
+</div>

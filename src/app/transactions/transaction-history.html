@@ -1,0 +1,16 @@
+<section class="panel min-w-0">
+  <h2 class="section-heading mb-4">Transaction history</h2>
+  <div class="mb-5 flex flex-col gap-3 sm:flex-row">
+    <input #historySearch class="field sm:max-w-80" type="search" placeholder="Search by name, category or reference"
+           aria-label="Filter transactions" [value]="query()" (input)="query.set(historySearch.value)">
+    <select #historyDirection class="field sm:w-43" aria-label="Transaction type" [value]="direction()"
+            (change)="setDirection(historyDirection.value)">
+      <option value="all">All transactions</option><option value="in">Money in</option><option value="out">Money out</option>
+    </select>
+    <button type="button" class="secondary whitespace-nowrap sm:ml-auto" [disabled]="!rows().length" (click)="exportRequested.emit()">
+      <svg lucideIcon="download" [size]="17" aria-hidden="true" /> Export CSV
+    </button>
+  </div>
+  <wallet-transaction-list [rows]="rows()" (transactionSelected)="transactionSelected.emit($event)" />
+  <p class="mt-4 text-xs text-slate-500">{{ rows().length }} transactions · Demo statement</p>
+</section>

@@ -1,0 +1,31 @@
+@if (rows().length) {
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[440px] text-left text-sm">
+      <thead class="border-b border-slate-100 text-[0.65rem] tracking-wider text-slate-500 uppercase">
+        <tr><th scope="col" class="pb-2 font-semibold">Transaction</th><th scope="col" class="pb-2 font-semibold">Date & time</th><th scope="col" class="pb-2 text-right font-semibold">Amount</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        @for (row of rows(); track row.id) {
+          <tr class="hover:bg-slate-50">
+            <td class="py-2.5 pr-2">
+              <button type="button" class="flex w-full items-center gap-2 rounded-md text-left" [attr.aria-label]="'View ' + row.name + ' transaction'"
+                      (click)="transactionSelected.emit(row)">
+                <span class="grid size-9 shrink-0 place-items-center rounded-xl"
+                      [class]="row.amount > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'">
+                  <svg [lucideIcon]="row.icon" [size]="17" aria-hidden="true" />
+                </span>
+                <span class="min-w-0"><strong class="block text-xs text-slate-900">{{ row.name }}</strong><span class="text-[0.68rem] text-slate-500">{{ row.category }}</span></span>
+              </button>
+            </td>
+            <td class="py-2.5 pr-2 text-xs whitespace-nowrap text-slate-600">{{ transactionDate(row.date) }}</td>
+            <td class="py-2.5 text-right text-xs font-semibold whitespace-nowrap tabular-nums" [class.text-emerald-700]="row.amount > 0">
+              {{ row.amount > 0 ? '+' : '−' }} MMK {{ money(row.amount) }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+} @else {
+  <p class="rounded-xl bg-slate-50 px-4 py-10 text-center text-sm text-slate-600">No transactions match your search.</p>
+}

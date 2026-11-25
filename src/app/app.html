@@ -1,0 +1,309 @@
+<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3">Skip to content</a>
+
+<ng-template #navItems>
+  <nav class="space-y-1" aria-label="Main navigation">
+    @for (item of navigation; track item.title) {
+      <button type="button" class="nav-button" [attr.aria-current]="item.title === active() ? 'page' : null"
+              (click)="navigate(item.title)">
+        <svg [lucideIcon]="item.icon" [size]="18" aria-hidden="true" /> {{ item.title }}
+      </button>
+    }
+  </nav>
+</ng-template>
+
+<aside class="fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-slate-200 bg-white lg:flex">
+  <button type="button" class="flex h-20 shrink-0 items-center gap-3 border-b border-slate-100 px-6 text-left" (click)="navigate('Overview')">
+    <span class="grid size-9 place-items-center rounded-xl bg-blue-600 text-white"><svg lucideIcon="landmark" [size]="22" aria-hidden="true" /></span>
+    <span class="text-2xl font-bold tracking-tight text-[#173467]">MyBank<span class="text-blue-600">.</span></span>
+  </button>
+  <div class="flex-1 overflow-y-auto p-4">
+    <ng-container [ngTemplateOutlet]="navItems" />
+  </div>
+  <div class="space-y-2 border-t border-slate-100 px-4 py-4">
+    <button type="button" class="nav-button" (click)="showPanel('security')">
+      <svg lucideIcon="shield-check" [size]="18" aria-hidden="true" /> Security center
+    </button>
+    <button type="button" class="nav-button" (click)="navigate('Settings')">
+      <span class="grid size-8 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-800">TW</span>
+      <span class="truncate">{{ account.name }}</span>
+    </button>
+  </div>
+</aside>
+
+<div class="min-h-screen pb-20 lg:ml-56 lg:pb-0">
+  <header class="sticky top-0 z-10 border-b border-slate-200 bg-white">
+    <div class="mx-auto flex min-h-17 max-w-screen-xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-7">
+      <div class="flex min-w-0 items-center gap-2.5">
+        <button type="button" class="icon-button lg:hidden" [attr.aria-expanded]="mobileMenu()" aria-controls="mobile-menu"
+                [attr.aria-label]="mobileMenu() ? 'Close navigation' : 'Open navigation'" (click)="mobileMenu.set(!mobileMenu())">
+          <svg [lucideIcon]="mobileMenu() ? 'x' : 'menu'" [size]="21" aria-hidden="true" />
+        </button>
+        <span class="truncate text-sm font-semibold text-slate-900 sm:text-base">{{ active() }}</span>
+      </div>
+      <div class="flex min-w-0 items-center gap-1 sm:gap-2">
+        <form class="hidden items-center gap-2 rounded-xl bg-slate-100 px-3.5 py-2 sm:flex" role="search" (submit)="findTransactions($event)">
+          <svg lucideIcon="search" [size]="16" class="text-slate-500" aria-hidden="true" />
+          <input #globalSearch type="search" class="w-32 text-sm text-slate-800 outline-none md:w-52" placeholder="Search transactions"
+                 aria-label="Search all transactions" [value]="query()" (input)="query.set(globalSearch.value)">
+        </form>
+        <button type="button" class="icon-button relative" aria-label="Notifications" (click)="showPanel('notifications')">
+          <svg lucideIcon="bell" [size]="19" aria-hidden="true" />
+          @if (unread()) { <span class="absolute top-2 right-2 size-2 rounded-full bg-blue-600 ring-2 ring-white"></span> }
+        </button>
+        <button type="button" class="grid size-9 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-800"
+                aria-label="Open profile" (click)="navigate('Settings')">TW</button>
+      </div>
+    </div>
+    <div id="mobile-menu" class="border-t border-slate-100 px-4 py-3 lg:hidden" [hidden]="!mobileMenu()">
+      <ng-container [ngTemplateOutlet]="navItems" />
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1" class="mx-auto max-w-screen-xl space-y-5 px-4 py-6 sm:space-y-6 sm:px-7 sm:py-8">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h1 class="text-[1.65rem] leading-tight font-bold tracking-tight text-[#132c56] sm:text-[2rem]">
+          {{ active() === 'Overview' ? 'Hello, Thet Htar' : active() }}
+        </h1>
+        @if (active() === 'Overview') { <p class="mt-1 text-sm text-slate-500">Here’s your wallet at a glance.</p> }
+      </div>
+      <span class="mt-1 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Demo account</span>
+    </div>
+
+    @switch (active()) {
+      @case ('Overview') {
+        <wallet-dashboard [(hideBalance)]="hideBalance" [(period)]="period"
+                          (actionRequested)="showAction($event.action, $event.recipient)"
+                          (screenRequested)="$event === 'Transactions' ? openHistory() : navigate($event)"
+                          (transactionSelected)="showPanel('receipt', $event)"
+                          (cardRequested)="showPanel('card')" (qrRequested)="showPanel('qr')" />
+      }
+      @case ('Transactions') {
+        <wallet-transaction-history [rows]="visibleTransactions()" [(query)]="query" [(direction)]="direction"
+                                    (exportRequested)="saveStatement()"
+                                    (transactionSelected)="showPanel('receipt', $event)" />
+      }
+      @case ('My wallets') {
+        <section class="panel max-w-xl">
+          <h2 class="section-heading mb-4">Main wallet</h2>
+          <dl class="mb-5 divide-y divide-slate-100 text-sm">
+            <div class="flex justify-between gap-4 py-3"><dt>Available balance</dt><dd class="font-semibold">MMK {{ money(wallet().balance) }}</dd></div>
+            <div class="flex justify-between gap-4 py-3"><dt>Account number</dt><dd>{{ account.formattedNumber }}</dd></div>
+          </dl>
+          <div class="grid gap-2 sm:grid-cols-2">
+            <button type="button" class="primary" (click)="showAction('topUp')"><svg lucideIcon="plus" [size]="17" aria-hidden="true" /> Top up</button>
+            <button type="button" class="secondary" (click)="showAction('withdraw')"><svg lucideIcon="arrow-down-to-line" [size]="17" aria-hidden="true" /> Withdraw</button>
+          </div>
+        </section>
+      }
+      @case ('Transfers') {
+        <div class="grid gap-5 xl:grid-cols-2">
+          <section class="panel">
+            <h2 class="section-heading mb-4">Send money</h2>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <button type="button" class="primary" (click)="showAction('send')"><svg lucideIcon="send" [size]="17" aria-hidden="true" /> Transfer money</button>
+              <button type="button" class="secondary" (click)="showPanel('qr')"><svg lucideIcon="qr-code" [size]="17" aria-hidden="true" /> Scan QR code</button>
+            </div>
+          </section>
+          <section class="panel">
+            <h2 class="section-heading mb-4">Recent recipients</h2>
+            <wallet-quick-contacts (contactSelected)="showAction('send', $event)" />
+          </section>
+        </div>
+      }
+      @case ('Payments') {
+        <section class="panel">
+          <h2 class="section-heading mb-4">Pay a bill</h2>
+          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            @for (bill of bills; track bill.name) {
+              <button type="button" class="flex min-h-24 items-center gap-3 rounded-xl border border-slate-200 p-3 text-left hover:bg-blue-50" (click)="showAction('bill', bill.name)">
+                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700"><svg [lucideIcon]="bill.icon" [size]="19" aria-hidden="true" /></span>
+                <span><strong class="block text-sm">{{ bill.name }}</strong><span class="text-xs text-slate-500">{{ bill.note }}</span></span>
+              </button>
+            }
+            <button type="button" class="flex min-h-24 items-center gap-3 rounded-xl border border-slate-200 p-3 text-left hover:bg-blue-50" (click)="showPanel('qr')">
+              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700"><svg lucideIcon="qr-code" [size]="19" aria-hidden="true" /></span>
+              <span><strong class="block text-sm">Scan & pay</strong><span class="text-xs text-slate-500">Scan or generate a demo QR</span></span>
+            </button>
+          </div>
+        </section>
+      }
+      @case ('Cards') {
+        <section class="panel max-w-xl">
+          <h2 class="section-heading mb-4">Premium debit card</h2>
+          <wallet-card [frozen]="wallet().frozen" />
+          <div class="mt-5 grid gap-2 sm:grid-cols-2">
+            <button type="button" class="secondary" (click)="flipCard()">
+              <svg lucideIcon="snowflake" [size]="17" aria-hidden="true" /> {{ wallet().frozen ? 'Unfreeze card' : 'Freeze card' }}
+            </button>
+            <button type="button" class="primary" (click)="showPanel('card')">View details</button>
+          </div>
+        </section>
+      }
+      @case ('Savings goals') {
+        <section class="panel max-w-xl">
+          <h2 class="section-heading mb-5">Your savings</h2>
+          <wallet-savings-progress [saved]="wallet().savings" />
+          <button type="button" class="primary mt-5" (click)="showAction('savings')">
+            <svg lucideIcon="plus" [size]="17" aria-hidden="true" /> Add to savings
+          </button>
+        </section>
+      }
+      @case ('Settings') {
+        <div class="grid gap-5 xl:grid-cols-2">
+          <section class="panel">
+            <h2 class="section-heading mb-4">Profile</h2>
+            <dl class="divide-y divide-slate-100 text-sm">
+              <div class="flex justify-between gap-3 py-3"><dt>Full name</dt><dd class="font-medium">{{ account.name }}</dd></div>
+              <div class="flex justify-between gap-3 py-3"><dt>Email</dt><dd>thet.htar@example.com</dd></div>
+              <div class="flex justify-between gap-3 py-3"><dt>Language</dt><dd>English</dd></div>
+              <div class="flex justify-between gap-3 py-3"><dt>Currency</dt><dd>Myanmar Kyat (MMK)</dd></div>
+            </dl>
+          </section>
+          <section class="panel space-y-4">
+            <h2 class="section-heading">Preferences</h2>
+            <label class="flex max-w-sm items-center justify-between gap-4 text-sm">
+              <span>Transaction notifications</span>
+              <input #notify type="checkbox" class="size-5 accent-blue-600" [checked]="notificationsEnabled()" (change)="notificationsEnabled.set(notify.checked)">
+            </label>
+            <button type="button" class="text-button" (click)="showPanel('security')">
+              <svg lucideIcon="shield-check" [size]="17" aria-hidden="true" /> Security center
+            </button>
+          </section>
+        </div>
+      }
+      @case ('Help & support') {
+        <section class="panel max-w-2xl divide-y divide-slate-100">
+          <details class="py-3">
+            <summary class="text-sm font-semibold">How do I make a transfer?</summary>
+            <p class="mt-2 text-sm text-slate-600">Open Transfers, enter a recipient and amount, then review and confirm the demo payment.</p>
+          </details>
+          <details class="py-3">
+            <summary class="text-sm font-semibold">Which QR codes can I scan?</summary>
+            <p class="mt-2 text-sm text-slate-600">Open QR to receive to create a MyBank demo code. Choose its saved image or scan it from another screen.</p>
+          </details>
+          <details class="py-3">
+            <summary class="text-sm font-semibold">Where is wallet activity stored?</summary>
+            <p class="mt-2 text-sm text-slate-600">Changes are stored for the current demo session and reset when you reload the page.</p>
+          </details>
+        </section>
+      }
+    }
+
+    <footer class="flex flex-wrap justify-between gap-2 border-t border-slate-200 py-4 text-xs text-slate-500">
+      <span>MyBank Wallet</span><span>Interactive demo · No real money is moved</span>
+    </footer>
+  </main>
+</div>
+
+<nav aria-label="Quick navigation" class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around gap-1 border-t border-slate-200 bg-white px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden">
+  @for (item of mobileNavigation; track item.screen; let index = $index) {
+    @if (index === 2) {
+      <button type="button" class="grid size-11 place-items-center rounded-xl bg-blue-600 text-white" aria-label="Scan and pay" (click)="showPanel('qr')">
+        <svg lucideIcon="qr-code" [size]="22" aria-hidden="true" />
+      </button>
+    }
+    <button type="button" class="flex min-w-11 flex-col items-center gap-1 py-1 text-[0.68rem] font-medium text-slate-600"
+            [class.text-blue-700]="active() === item.screen" [attr.aria-current]="active() === item.screen ? 'page' : null" (click)="navigate(item.screen)">
+      <svg [lucideIcon]="item.icon" [size]="19" aria-hidden="true" /> {{ item.label }}
+    </button>
+  }
+</nav>
+
+<dialog #dialog aria-labelledby="dialog-title"
+        class="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/42 backdrop:backdrop-blur-xs"
+        (close)="clearClosedModal()" (click)="closeOnBackdrop($event)">
+  <div class="p-5 sm:p-6">
+    <div class="mb-4 flex items-center justify-between gap-3">
+      <h2 id="dialog-title" class="text-xl font-bold tracking-tight">{{ modalTitle() }}</h2>
+      <button type="button" class="icon-button" aria-label="Close dialog" (click)="closeModal()"><svg lucideIcon="x" [size]="20" aria-hidden="true" /></button>
+    </div>
+
+    @switch (modal()) {
+      @case ('action') {
+        @if (receipt(); as completed) {
+          <div class="text-center">
+            <div class="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-emerald-50 text-emerald-700"><svg lucideIcon="check-check" [size]="25" aria-hidden="true" /></div>
+            <p class="text-lg font-semibold">Demo {{ completed.category.toLowerCase() }} completed</p>
+            <p class="my-2 text-2xl font-bold">MMK {{ money(completed.amount) }}</p>
+            <p class="text-sm text-slate-600">{{ completed.name }}</p>
+            <p class="mt-2 text-xs text-slate-500">{{ completed.id }}</p>
+            <button type="button" class="primary mt-5 w-full" (click)="saveStatement(completed)"><svg lucideIcon="download" [size]="16" aria-hidden="true" /> Download receipt</button>
+            <button type="button" class="text-button mt-3 min-h-9" (click)="openHistory()">View transaction history</button>
+          </div>
+        } @else if (draft(); as review) {
+          <p class="mb-4 text-sm text-slate-600">Review the details before you confirm.</p>
+          <dl class="space-y-3 rounded-xl bg-slate-50 p-4 text-sm">
+            <div class="flex justify-between gap-4"><dt>{{ review.action === 'topUp' ? 'From' : 'To' }}</dt><dd class="break-all text-right font-semibold">{{ review.target }}</dd></div>
+            <div class="flex justify-between gap-4"><dt>Amount</dt><dd class="font-semibold">MMK {{ money(review.amount) }}</dd></div>
+            <div class="flex justify-between gap-4"><dt>Fee</dt><dd class="font-medium text-emerald-700">Free</dd></div>
+          </dl>
+          <button type="button" class="primary mt-5 w-full" (click)="confirm()">
+            <svg lucideIcon="check" [size]="17" aria-hidden="true" /> Confirm demo {{ review.action === 'topUp' ? 'top-up' : review.action === 'savings' ? 'contribution' : 'payment' }}
+          </button>
+          <button type="button" class="text-button mt-3 min-h-9 w-full justify-center" (click)="draft.set(null)">Back to edit</button>
+        } @else {
+          <form class="space-y-4" (submit)="review($event)" novalidate>
+            <p class="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">Demo mode · Available balance <b>MMK {{ money(wallet().balance) }}</b></p>
+            @if (actions[action()].label) {
+              <label class="block text-sm font-medium">
+                {{ actions[action()].label }}
+                <input #recipientInput class="field mt-1.5" autocomplete="off" maxlength="120" required
+                       [value]="recipient()" (input)="recipient.set(recipientInput.value)">
+              </label>
+            }
+            <label class="block text-sm font-medium">
+              Amount (MMK)
+              <input #amountInput class="field mt-1.5" inputmode="numeric" placeholder="0" required
+                     [value]="amount()" (input)="amount.set(amountInput.value)">
+            </label>
+            @if (error()) { <p role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ error() }}</p> }
+            <button type="submit" class="primary w-full">Review details <svg lucideIcon="arrow-right" [size]="17" aria-hidden="true" /></button>
+          </form>
+        }
+      }
+      @case ('receipt') {
+        @if (receipt(); as transaction) {
+          <dl class="divide-y divide-slate-100 rounded-xl border border-slate-100 px-4 text-sm">
+            <div class="flex justify-between gap-3 py-3"><dt>Transaction</dt><dd class="break-all text-right font-semibold">{{ transaction.name }}</dd></div>
+            <div class="flex justify-between gap-3 py-3"><dt>Category</dt><dd>{{ transaction.category }}</dd></div>
+            <div class="flex justify-between gap-3 py-3"><dt>Amount</dt><dd class="font-semibold">{{ transaction.amount > 0 ? '+' : '−' }} MMK {{ money(transaction.amount) }}</dd></div>
+            <div class="flex justify-between gap-3 py-3"><dt>Date</dt><dd>{{ transactionDate(transaction.date) }}</dd></div>
+            <div class="flex justify-between gap-3 py-3"><dt>Reference</dt><dd class="break-all text-right">{{ transaction.id }}</dd></div>
+          </dl>
+          <button type="button" class="primary mt-5 w-full" (click)="saveStatement(transaction)"><svg lucideIcon="download" [size]="16" aria-hidden="true" /> Download receipt</button>
+        }
+      }
+      @case ('qr') { <wallet-qr-payments (pay)="showAction('send', $event.recipient, $event.amount)" /> }
+      @case ('notifications') {
+        <div class="space-y-3">
+          <p class="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{{ unread() ? 'You have unread notifications.' : 'You’re all caught up.' }}</p>
+          @if (lastNotification(); as transaction) {
+            <p class="rounded-xl border border-slate-200 p-3 text-sm"><strong>{{ transaction.category }}</strong><br><span class="text-slate-600">{{ transaction.name }} · MMK {{ money(transaction.amount) }}</span></p>
+          }
+          <p class="rounded-xl border border-slate-200 p-3 text-sm"><strong>Wallet ready</strong><br><span class="text-slate-600">Your demo wallet is ready to explore.</span></p>
+          @if (unread()) { <button type="button" class="primary w-full" (click)="markRead()">Mark all as read</button> }
+        </div>
+      }
+      @case ('security') {
+        <div class="space-y-3 text-sm text-slate-600">
+          <p>The demo does not collect passwords, PINs, or identity documents.</p>
+          <p class="flex items-center gap-2"><svg lucideIcon="shield-check" [size]="18" class="text-emerald-700" aria-hidden="true" /> Keep one-time codes and PINs private.</p>
+          <p class="flex items-center gap-2"><svg lucideIcon="lock-keyhole" [size]="18" class="text-emerald-700" aria-hidden="true" /> Review account activity regularly.</p>
+        </div>
+      }
+      @case ('card') {
+        <wallet-card [frozen]="wallet().frozen" />
+        <dl class="mt-4 divide-y divide-slate-100 text-sm">
+          <div class="flex justify-between py-2"><dt>Status</dt><dd class="font-semibold">{{ wallet().frozen ? 'Frozen' : 'Active' }}</dd></div>
+          <div class="flex justify-between py-2"><dt>Expiry</dt><dd>08 / 28</dd></div>
+          <div class="flex justify-between py-2"><dt>Demo daily limit</dt><dd>MMK 500,000</dd></div>
+        </dl>
+      }
+    }
+  </div>
+</dialog>
+
+@if (notice()) {
+  <div role="status" class="fixed right-4 bottom-23 z-30 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg lg:bottom-5">{{ notice() }}</div>
+}

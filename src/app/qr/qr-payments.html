@@ -1,0 +1,89 @@
+<div class="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" aria-label="QR payment direction">
+  <button type="button" class="flex min-h-10 items-center justify-center gap-2 rounded-lg text-sm font-semibold"
+          [class.bg-white]="mode() === 'pay'" [class.text-blue-700]="mode() === 'pay'"
+          [attr.aria-pressed]="mode() === 'pay'" (click)="selectMode('pay')">
+    <svg lucideIcon="arrow-up-right" [size]="16" aria-hidden="true" /> QR to pay
+  </button>
+  <button type="button" class="flex min-h-10 items-center justify-center gap-2 rounded-lg text-sm font-semibold"
+          [class.bg-white]="mode() === 'receive'" [class.text-blue-700]="mode() === 'receive'"
+          [attr.aria-pressed]="mode() === 'receive'" (click)="selectMode('receive')">
+    <svg lucideIcon="arrow-down-left" [size]="16" aria-hidden="true" /> QR to receive
+  </button>
+</div>
+
+@if (mode() === 'pay') {
+  <div class="relative mx-auto mb-4 grid aspect-square w-full max-w-56 place-items-center overflow-hidden rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50">
+    <video #video muted playsinline aria-label="Live camera QR scanner" class="absolute inset-0 size-full object-cover"
+           [class.opacity-0]="state() !== 'camera'"></video>
+    @if (state() !== 'camera') {
+      <svg lucideIcon="qr-code" [size]="82" [strokeWidth]="1" class="text-blue-300" aria-hidden="true" />
+    }
+    <div class="pointer-events-none absolute inset-5 rounded-xl border-2 border-blue-400"></div>
+    <span role="status" class="absolute bottom-3 rounded-full bg-white px-3 py-1 text-xs font-medium text-blue-700">
+      @switch (state()) {
+        @case ('starting') { Starting camera… }
+        @case ('camera') { Align QR inside the frame }
+        @case ('image') { Reading image… }
+        @default { Ready to scan }
+      }
+    </span>
+  </div>
+
+  <p class="mb-5 text-center text-sm leading-relaxed text-slate-500">
+    Scan or choose a MyBank demo QR. You’ll review the payment before confirming.
+  </p>
+  @if (state() === 'camera' || state() === 'starting') {
+    <button type="button" class="primary w-full" (click)="stop()">
+      <svg lucideIcon="square" [size]="16" aria-hidden="true" /> Stop scanning
+    </button>
+  } @else {
+    <button type="button" class="primary w-full" [disabled]="state() === 'image'" (click)="startCamera()">
+      <svg lucideIcon="camera" [size]="17" aria-hidden="true" /> Start camera scan
+    </button>
+  }
+  <input #qrFile type="file" accept="image/*" hidden aria-label="Choose QR image" (change)="chooseFile(qrFile)">
+  <button type="button" class="secondary mt-2 w-full" [disabled]="state() === 'image'" (click)="qrFile.click()">
+    <svg lucideIcon="image-plus" [size]="17" aria-hidden="true" /> Choose QR image
+  </button>
+  <button type="button" class="text-button mt-3 min-h-9 w-full justify-center" (click)="tryPayment()">
+    Try demo QR payment <svg lucideIcon="arrow-right" [size]="16" aria-hidden="true" />
+  </button>
+} @else {
+  <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-center">
+    <p class="font-semibold text-slate-900">{{ account.name }}</p>
+    <p class="mb-3 text-xs text-slate-500">MyBank Wallet · MMK</p>
+    <div class="mx-auto grid size-52 max-w-full place-items-center overflow-hidden rounded-xl bg-white shadow-sm">
+      @if (imageUrl(); as url) {
+        <img [src]="url" alt="MyBank demo receiving QR code" width="208" height="208">
+      } @else {
+        <svg lucideIcon="qr-code" [size]="60" class="text-blue-200" aria-hidden="true" />
+      }
+    </div>
+    <button type="button" class="text-button mt-3 min-h-8 text-xs" (click)="copyAccount()"
+            [attr.aria-label]="'Copy demo account number ' + account.number">
+      {{ account.formattedNumber }} <svg lucideIcon="copy" [size]="14" aria-hidden="true" />
+    </button>
+    @if (parsedAmount(); as requested) {
+      <p class="mt-1 text-lg font-semibold text-blue-700">MMK {{ money(requested) }}</p>
+    }
+  </div>
+
+  <label for="qr-amount" class="mb-2 mt-4 block text-sm font-medium">Request an amount <span class="text-slate-500">(optional)</span></label>
+  <input #requestAmount id="qr-amount" class="field" inputmode="numeric" placeholder="MMK" [value]="amount()"
+         [attr.aria-invalid]="!validAmount()" [attr.aria-describedby]="validAmount() ? null : 'qr-amount-error'"
+         (input)="setAmount(requestAmount.value)">
+  @if (!validAmount()) {
+    <p id="qr-amount-error" role="alert" class="mt-2 text-sm text-red-700">Enter a positive whole MMK amount.</p>
+  }
+  <button type="button" class="primary mt-4 w-full" [disabled]="!svg() || !validAmount()" (click)="saveQr()">
+    <svg lucideIcon="download" [size]="16" aria-hidden="true" /> Save QR code
+  </button>
+  <p class="mt-3 text-center text-xs leading-relaxed text-slate-500">Demo QR only. It can be read by this wallet demo.</p>
+}
+
+@if (error()) {
+  <p role="alert" class="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ error() }}</p>
+}
+@if (status()) {
+  <p role="status" class="mt-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{{ status() }}</p>
+}

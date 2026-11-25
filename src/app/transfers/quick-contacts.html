@@ -1,0 +1,9 @@
+<div class="grid grid-cols-4 gap-1">
+  @for (person of people; track person.name) {
+    <button type="button" class="flex flex-col items-center gap-2 rounded-lg px-1 py-1.5 text-xs font-medium hover:bg-slate-50"
+            [attr.aria-label]="'Transfer to ' + person.name" (click)="contactSelected.emit(person.name)">
+      <span class="grid size-9 place-items-center rounded-full font-semibold" [class]="person.color">{{ person.initials }}</span>
+      <span class="truncate">{{ person.name }}</span>
+    </button>
+  }
+</div>
