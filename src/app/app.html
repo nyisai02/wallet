@@ -1,8 +1,39 @@
 <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3">Skip to content</a>
 
+@if (!session() && !preview()) {
+  <main id="main" class="grid min-h-screen place-items-center p-5">
+    <section class="panel w-full max-w-md">
+      <div class="mb-5 flex items-center gap-3">
+        <span class="grid size-10 place-items-center rounded-xl bg-blue-600 text-white"><svg lucideIcon="landmark" [size]="22" aria-hidden="true" /></span>
+        <span class="text-2xl font-bold tracking-tight text-[#173467]">MyBank<span class="text-blue-600">.</span></span>
+      </div>
+      <h1 class="text-xl font-bold text-[#132c56]">Connect to Demo Wallet</h1>
+      <p class="mt-2 mb-5 text-sm text-slate-600">Use a registered mobile number and the currency configured for that wallet.</p>
+      <form class="space-y-4" (submit)="connect($event, mobile.value, walletCurrency.value, hub.value)">
+        <label class="block text-sm font-medium">
+          Mobile number (MSISDN)
+          <input #mobile class="field mt-1.5" type="tel" autocomplete="tel" maxlength="16" [disabled]="busy()" required>
+        </label>
+        <label class="block text-sm font-medium">
+          Wallet currency
+          <input #walletCurrency class="field mt-1.5 uppercase" value="MMK" maxlength="3" [disabled]="busy()" required>
+        </label>
+        <label class="block text-sm font-medium">
+          Transfer route
+          <select #hub class="field mt-1.5" [disabled]="busy()">
+            @for (route of demoHubs; track route.id) { <option [value]="route.id">{{ route.name }}</option> }
+          </select>
+        </label>
+        @if (connectionError()) { <p role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ connectionError() }}</p> }
+        <button type="submit" class="primary w-full" [disabled]="busy()">{{ busy() ? 'Connecting…' : 'Connect wallet' }}</button>
+      </form>
+      <button type="button" class="text-button mt-4 w-full justify-center" [disabled]="busy()" (click)="openPreview()">Open standalone preview</button>
+    </section>
+  </main>
+} @else {
 <ng-template #navItems>
   <nav class="space-y-1" aria-label="Main navigation">
-    @for (item of navigation; track item.title) {
+    @for (item of navigation(); track item.title) {
       <button type="button" class="nav-button" [attr.aria-current]="item.title === active() ? 'page' : null"
               (click)="navigate(item.title)">
         <svg [lucideIcon]="item.icon" [size]="18" aria-hidden="true" /> {{ item.title }}
@@ -20,12 +51,14 @@
     <ng-container [ngTemplateOutlet]="navItems" />
   </div>
   <div class="space-y-2 border-t border-slate-100 px-4 py-4">
-    <button type="button" class="nav-button" (click)="showPanel('security')">
-      <svg lucideIcon="shield-check" [size]="18" aria-hidden="true" /> Security center
-    </button>
+    @if (preview()) {
+      <button type="button" class="nav-button" (click)="showPanel('security')">
+        <svg lucideIcon="shield-check" [size]="18" aria-hidden="true" /> Security center
+      </button>
+    }
     <button type="button" class="nav-button" (click)="navigate('Settings')">
-      <span class="grid size-8 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-800">TW</span>
-      <span class="truncate">{{ account.name }}</span>
+      <span class="grid size-8 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-800">{{ initials() }}</span>
+      <span class="truncate">{{ account().name }}</span>
     </button>
   </div>
 </aside>
@@ -51,7 +84,7 @@
           @if (unread()) { <span class="absolute top-2 right-2 size-2 rounded-full bg-blue-600 ring-2 ring-white"></span> }
         </button>
         <button type="button" class="grid size-9 shrink-0 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-800"
-                aria-label="Open profile" (click)="navigate('Settings')">TW</button>
+                aria-label="Open profile" (click)="navigate('Settings')">{{ initials() }}</button>
       </div>
     </div>
     <div id="mobile-menu" class="border-t border-slate-100 px-4 py-3 lg:hidden" [hidden]="!mobileMenu()">
@@ -63,12 +96,27 @@
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 class="text-[1.65rem] leading-tight font-bold tracking-tight text-[#132c56] sm:text-[2rem]">
-          {{ active() === 'Overview' ? 'Hello, Thet Htar' : active() }}
+          {{ active() === 'Overview' ? 'Hello, ' + account().name : active() }}
         </h1>
         @if (active() === 'Overview') { <p class="mt-1 text-sm text-slate-500">Here’s your wallet at a glance.</p> }
       </div>
-      <span class="mt-1 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Demo account</span>
+      @if (session(); as connected) {
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ connected.account.payerDfspId }} · Demo Wallet</span>
+          <button type="button" class="secondary" [disabled]="refreshing()" (click)="refreshWallet()">{{ refreshing() ? 'Refreshing…' : 'Refresh wallet' }}</button>
+        </div>
+      } @else {
+        <span class="mt-1 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">Standalone preview</span>
+      }
     </div>
+
+    @if (refreshError()) { <p role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ refreshError() }}</p> }
+    @for (pending of pendingTransfers(); track pending.id) {
+      <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+        <span>Transfer pending · {{ pending.name }}</span>
+        <button type="button" class="text-button" (click)="showPanel('receipt', pending)">Review transfer status</button>
+      </div>
+    }
 
     @switch (active()) {
       @case ('Overview') {
@@ -87,11 +135,11 @@
         <section class="panel max-w-xl">
           <h2 class="section-heading mb-4">Main wallet</h2>
           <dl class="mb-5 divide-y divide-slate-100 text-sm">
-            <div class="flex justify-between gap-4 py-3"><dt>Available balance</dt><dd class="font-semibold">MMK {{ money(wallet().balance) }}</dd></div>
-            <div class="flex justify-between gap-4 py-3"><dt>Account number</dt><dd>{{ account.formattedNumber }}</dd></div>
+            <div class="flex justify-between gap-4 py-3"><dt>Available balance</dt><dd class="font-semibold">{{ currency() }} {{ money(wallet().balance) }}</dd></div>
+            <div class="flex justify-between gap-4 py-3"><dt>{{ session() ? 'Mobile number' : 'Account number' }}</dt><dd>{{ account().formattedNumber }}</dd></div>
           </dl>
           <div class="grid gap-2 sm:grid-cols-2">
-            <button type="button" class="primary" (click)="showAction('topUp')"><svg lucideIcon="plus" [size]="17" aria-hidden="true" /> Top up</button>
+            <button type="button" class="primary" (click)="showAction('topUp')"><svg lucideIcon="plus" [size]="17" aria-hidden="true" /> {{ session() ? 'Deposit' : 'Top up' }}</button>
             <button type="button" class="secondary" (click)="showAction('withdraw')"><svg lucideIcon="arrow-down-to-line" [size]="17" aria-hidden="true" /> Withdraw</button>
           </div>
         </section>
@@ -105,10 +153,12 @@
               <button type="button" class="secondary" (click)="showPanel('qr')"><svg lucideIcon="qr-code" [size]="17" aria-hidden="true" /> Scan QR code</button>
             </div>
           </section>
-          <section class="panel">
-            <h2 class="section-heading mb-4">Recent recipients</h2>
-            <wallet-quick-contacts (contactSelected)="showAction('send', $event)" />
-          </section>
+          @if (preview()) {
+            <section class="panel">
+              <h2 class="section-heading mb-4">Recent recipients</h2>
+              <wallet-quick-contacts (contactSelected)="showAction('send', $event)" />
+            </section>
+          }
         </div>
       }
       @case ('Payments') {
@@ -154,10 +204,15 @@
           <section class="panel">
             <h2 class="section-heading mb-4">Profile</h2>
             <dl class="divide-y divide-slate-100 text-sm">
-              <div class="flex justify-between gap-3 py-3"><dt>Full name</dt><dd class="font-medium">{{ account.name }}</dd></div>
-              <div class="flex justify-between gap-3 py-3"><dt>Email</dt><dd>thet.htar@example.com</dd></div>
+              <div class="flex justify-between gap-3 py-3"><dt>Full name</dt><dd class="font-medium">{{ account().name }}</dd></div>
+              @if (session(); as connected) {
+                <div class="flex justify-between gap-3 py-3"><dt>Mobile number</dt><dd>{{ connected.account.mobile }}</dd></div>
+                <div class="flex justify-between gap-3 py-3"><dt>Provider</dt><dd>{{ connected.account.payerDfspId }}</dd></div>
+              } @else {
+                <div class="flex justify-between gap-3 py-3"><dt>Email</dt><dd>thet.htar@example.com</dd></div>
+              }
               <div class="flex justify-between gap-3 py-3"><dt>Language</dt><dd>English</dd></div>
-              <div class="flex justify-between gap-3 py-3"><dt>Currency</dt><dd>Myanmar Kyat (MMK)</dd></div>
+              <div class="flex justify-between gap-3 py-3"><dt>Currency</dt><dd>{{ currency() }}</dd></div>
             </dl>
           </section>
           <section class="panel space-y-4">
@@ -166,9 +221,7 @@
               <span>Transaction notifications</span>
               <input #notify type="checkbox" class="size-5 accent-blue-600" [checked]="notificationsEnabled()" (change)="notificationsEnabled.set(notify.checked)">
             </label>
-            <button type="button" class="text-button" (click)="showPanel('security')">
-              <svg lucideIcon="shield-check" [size]="17" aria-hidden="true" /> Security center
-            </button>
+            <button type="button" class="secondary" [disabled]="refreshing()" (click)="disconnect()">{{ session() ? 'Disconnect wallet' : 'Exit preview' }}</button>
           </section>
         </div>
       }
@@ -176,22 +229,22 @@
         <section class="panel max-w-2xl divide-y divide-slate-100">
           <details class="py-3">
             <summary class="text-sm font-semibold">How do I make a transfer?</summary>
-            <p class="mt-2 text-sm text-slate-600">Open Transfers, enter a recipient and amount, then review and confirm the demo payment.</p>
+            <p class="mt-2 text-sm text-slate-600">{{ session() ? 'Open Transfers, select the recipient provider, and enter the recipient ID and amount. Review the quote before you confirm.' : 'Open Transfers, enter a recipient and amount, then review and confirm the demo payment.' }}</p>
           </details>
           <details class="py-3">
             <summary class="text-sm font-semibold">Which QR codes can I scan?</summary>
-            <p class="mt-2 text-sm text-slate-600">Open QR to receive to create a MyBank demo code. Choose its saved image or scan it from another screen.</p>
+            <p class="mt-2 text-sm text-slate-600">{{ session() ? 'Scan an external Demo Wallet QR for your connected route and currency.' : 'Open QR to receive to create a MyBank demo code. Choose its saved image or scan it from another screen.' }}</p>
           </details>
           <details class="py-3">
             <summary class="text-sm font-semibold">Where is wallet activity stored?</summary>
-            <p class="mt-2 text-sm text-slate-600">Changes are stored for the current demo session and reset when you reload the page.</p>
+            <p class="mt-2 text-sm text-slate-600">{{ session() ? 'Your balance and posted activity come from the Demo Wallet server.' : 'Preview activity resets when you reload the page.' }}</p>
           </details>
         </section>
       }
     }
 
     <footer class="flex flex-wrap justify-between gap-2 border-t border-slate-200 py-4 text-xs text-slate-500">
-      <span>MyBank Wallet</span><span>Interactive demo · No real money is moved</span>
+      <span>MyBank Wallet</span><span>{{ session() ? 'Demo Wallet sandbox' : 'Standalone preview' }}</span>
     </footer>
   </main>
 </div>
@@ -209,56 +262,102 @@
     </button>
   }
 </nav>
+}
 
 <dialog #dialog aria-labelledby="dialog-title"
         class="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-2xl bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/42 backdrop:backdrop-blur-xs"
-        (close)="clearClosedModal()" (click)="closeOnBackdrop($event)">
+        (close)="clearClosedModal()" (cancel)="cancelModal($event)" (click)="closeOnBackdrop($event)">
   <div class="p-5 sm:p-6">
     <div class="mb-4 flex items-center justify-between gap-3">
       <h2 id="dialog-title" class="text-xl font-bold tracking-tight">{{ modalTitle() }}</h2>
-      <button type="button" class="icon-button" aria-label="Close dialog" (click)="closeModal()"><svg lucideIcon="x" [size]="20" aria-hidden="true" /></button>
+      <button type="button" class="icon-button" aria-label="Close dialog" [disabled]="busy()" (click)="closeModal()"><svg lucideIcon="x" [size]="20" aria-hidden="true" /></button>
     </div>
 
     @switch (modal()) {
       @case ('action') {
         @if (receipt(); as completed) {
           <div class="text-center">
-            <div class="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-emerald-50 text-emerald-700"><svg lucideIcon="check-check" [size]="25" aria-hidden="true" /></div>
-            <p class="text-lg font-semibold">Demo {{ completed.category.toLowerCase() }} completed</p>
-            <p class="my-2 text-2xl font-bold">MMK {{ money(completed.amount) }}</p>
+            @if (completed.status === undefined || completed.status === 'Completed') {
+              <div class="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-emerald-50 text-emerald-700"><svg lucideIcon="check-check" [size]="25" aria-hidden="true" /></div>
+            }
+            <p class="text-lg font-semibold">{{ completed.category }} · {{ completed.status ?? 'Completed' }}</p>
+            <p class="my-2 text-2xl font-bold">{{ currency() }} {{ money(completed.amount) }}</p>
             <p class="text-sm text-slate-600">{{ completed.name }}</p>
-            <p class="mt-2 text-xs text-slate-500">{{ completed.id }}</p>
-            <button type="button" class="primary mt-5 w-full" (click)="saveStatement(completed)"><svg lucideIcon="download" [size]="16" aria-hidden="true" /> Download receipt</button>
-            <button type="button" class="text-button mt-3 min-h-9" (click)="openHistory()">View transaction history</button>
+            @if (transactionReference(completed); as reference) { <p class="mt-2 break-all text-xs text-slate-500">{{ reference }}</p> }
+            <ng-container [ngTemplateOutlet]="receiptActions" [ngTemplateOutletContext]="{ $implicit: completed }" />
+            <button type="button" class="text-button mt-3 min-h-9" [disabled]="busy()" (click)="openHistory()">View transaction history</button>
           </div>
         } @else if (draft(); as review) {
           <p class="mb-4 text-sm text-slate-600">Review the details before you confirm.</p>
           <dl class="space-y-3 rounded-xl bg-slate-50 p-4 text-sm">
-            <div class="flex justify-between gap-4"><dt>{{ review.action === 'topUp' ? 'From' : 'To' }}</dt><dd class="break-all text-right font-semibold">{{ review.target }}</dd></div>
-            <div class="flex justify-between gap-4"><dt>Amount</dt><dd class="font-semibold">MMK {{ money(review.amount) }}</dd></div>
-            <div class="flex justify-between gap-4"><dt>Fee</dt><dd class="font-medium text-emerald-700">Free</dd></div>
+            <div class="flex justify-between gap-4"><dt>{{ review.transferId ? 'Recipient' : session() ? 'Wallet' : review.action === 'topUp' ? 'From' : 'To' }}</dt><dd class="break-all text-right font-semibold">{{ review.target }}</dd></div>
+            @if (review.provider) {
+              <div class="flex justify-between gap-4"><dt>Recipient provider</dt><dd class="font-semibold">{{ review.provider }}</dd></div>
+            }
+            <div class="flex justify-between gap-4"><dt>{{ review.transferId ? 'Quoted debit' : 'Amount' }}</dt><dd class="font-semibold">{{ currency() }} {{ money(review.amount) }}</dd></div>
+            @if (review.receiveAmount; as receive) {
+              <div class="flex justify-between gap-4"><dt>Recipient receives</dt><dd class="font-semibold">{{ receive.currency }} {{ money(receive.amount) }}</dd></div>
+            }
+            @if (preview()) { <div class="flex justify-between gap-4"><dt>Fee</dt><dd class="font-medium text-emerald-700">Free</dd></div> }
           </dl>
-          <button type="button" class="primary mt-5 w-full" (click)="confirm()">
-            <svg lucideIcon="check" [size]="17" aria-hidden="true" /> Confirm demo {{ review.action === 'topUp' ? 'top-up' : review.action === 'savings' ? 'contribution' : 'payment' }}
+          <button type="button" class="primary mt-5 w-full" [disabled]="busy()" (click)="confirm()">
+            <svg lucideIcon="check" [size]="17" aria-hidden="true" /> {{ busy() ? 'Confirming…' : 'Confirm ' + (review.action === 'topUp' ? (session() ? 'deposit' : 'top-up') : review.action === 'withdraw' ? 'withdrawal' : review.action === 'savings' ? 'contribution' : 'transfer') }}
           </button>
-          <button type="button" class="text-button mt-3 min-h-9 w-full justify-center" (click)="draft.set(null)">Back to edit</button>
+          <button type="button" class="text-button mt-3 min-h-9 w-full justify-center" [disabled]="busy()" (click)="draft.set(null)">Back to edit</button>
         } @else {
           <form class="space-y-4" (submit)="review($event)" novalidate>
-            <p class="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">Demo mode · Available balance <b>MMK {{ money(wallet().balance) }}</b></p>
-            @if (actions[action()].label) {
+            <p class="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">Available balance <b>{{ currency() }} {{ money(wallet().balance) }}</b></p>
+            @if (session(); as connected) {
+              @if (action() === 'send') {
+                <label class="block text-sm font-medium">
+                  Recipient provider
+                  <select #providerInput class="field mt-1.5" required [disabled]="busy() || loadingProviders()" (change)="provider.set(providerInput.value)">
+                    <option value="" [selected]="!providers().includes(provider())">{{ loadingProviders() ? 'Loading providers…' : 'Select a provider' }}</option>
+                    @for (option of providers(); track option) { <option [value]="option" [selected]="option === provider()">{{ option }}</option> }
+                  </select>
+                </label>
+                @if (providersError()) {
+                  <p role="alert" class="text-sm text-red-700">{{ providersError() }}</p>
+                  <button type="button" class="text-button" (click)="loadProviders()">Retry loading providers</button>
+                }
+                @if (connected.hub !== 'thitsaconnect') {
+                  <label class="block text-sm font-medium">
+                    Recipient ID type
+                    <select #idType class="field mt-1.5" [value]="partyIdType()" [disabled]="busy()" (change)="partyIdType.set(idType.value === 'ACCOUNT_ID' ? 'ACCOUNT_ID' : 'MSISDN')">
+                      <option value="MSISDN">Mobile number (MSISDN)</option>
+                      <option value="ACCOUNT_ID">Account ID</option>
+                    </select>
+                  </label>
+                }
+                <label class="block text-sm font-medium">
+                  {{ partyIdType() === 'MSISDN' ? 'Recipient mobile number' : 'Recipient account ID' }}
+                  <input #idInput class="field mt-1.5" [attr.inputmode]="partyIdType() === 'MSISDN' ? 'tel' : null" autocomplete="off"
+                         maxlength="128" required [disabled]="busy()" [value]="recipient()" (input)="recipient.set(idInput.value)">
+                </label>
+                @if (partyIdType() === 'ACCOUNT_ID') {
+                  <label class="block text-sm font-medium">
+                    Recipient mobile number (optional)
+                    <input #subInput class="field mt-1.5" type="tel" maxlength="16" [disabled]="busy()" [value]="subId()" (input)="subId.set(subInput.value)">
+                  </label>
+                }
+              }
+            } @else if (actions[action()].label) {
               <label class="block text-sm font-medium">
                 {{ actions[action()].label }}
-                <input #recipientInput class="field mt-1.5" autocomplete="off" maxlength="120" required
+                <input #recipientInput class="field mt-1.5" autocomplete="off" maxlength="120" required [disabled]="busy()"
                        [value]="recipient()" (input)="recipient.set(recipientInput.value)">
               </label>
             }
             <label class="block text-sm font-medium">
-              Amount (MMK)
-              <input #amountInput class="field mt-1.5" inputmode="numeric" placeholder="0" required
+              Amount ({{ currency() }})
+              <input #amountInput class="field mt-1.5" [attr.inputmode]="session() ? 'decimal' : 'numeric'" placeholder="0" required [disabled]="busy()"
                      [value]="amount()" (input)="amount.set(amountInput.value)">
             </label>
             @if (error()) { <p role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ error() }}</p> }
-            <button type="submit" class="primary w-full">Review details <svg lucideIcon="arrow-right" [size]="17" aria-hidden="true" /></button>
+            <button type="submit" class="primary w-full" [disabled]="busy() || (session() && action() === 'send' && !providers().length)">
+              {{ busy() ? 'Getting quote…' : session() && action() === 'send' ? 'Get quote' : 'Review details' }}
+              <svg lucideIcon="arrow-right" [size]="17" aria-hidden="true" />
+            </button>
           </form>
         }
       }
@@ -267,19 +366,22 @@
           <dl class="divide-y divide-slate-100 rounded-xl border border-slate-100 px-4 text-sm">
             <div class="flex justify-between gap-3 py-3"><dt>Transaction</dt><dd class="break-all text-right font-semibold">{{ transaction.name }}</dd></div>
             <div class="flex justify-between gap-3 py-3"><dt>Category</dt><dd>{{ transaction.category }}</dd></div>
-            <div class="flex justify-between gap-3 py-3"><dt>Amount</dt><dd class="font-semibold">{{ transaction.amount > 0 ? '+' : '−' }} MMK {{ money(transaction.amount) }}</dd></div>
+            <div class="flex justify-between gap-3 py-3"><dt>Amount</dt><dd class="font-semibold">{{ transaction.amount > 0 ? '+' : '−' }} {{ currency() }} {{ money(transaction.amount) }}</dd></div>
             <div class="flex justify-between gap-3 py-3"><dt>Date</dt><dd>{{ transactionDate(transaction.date) }}</dd></div>
-            <div class="flex justify-between gap-3 py-3"><dt>Reference</dt><dd class="break-all text-right">{{ transaction.id }}</dd></div>
+            @if (transactionReference(transaction); as reference) {
+              <div class="flex justify-between gap-3 py-3"><dt>Reference</dt><dd class="break-all text-right">{{ reference }}</dd></div>
+            }
+            <div class="flex justify-between gap-3 py-3"><dt>Status</dt><dd>{{ transaction.status ?? 'Completed' }}</dd></div>
           </dl>
-          <button type="button" class="primary mt-5 w-full" (click)="saveStatement(transaction)"><svg lucideIcon="download" [size]="16" aria-hidden="true" /> Download receipt</button>
+          <ng-container [ngTemplateOutlet]="receiptActions" [ngTemplateOutletContext]="{ $implicit: transaction }" />
         }
       }
-      @case ('qr') { <wallet-qr-payments (pay)="showAction('send', $event.recipient, $event.amount)" /> }
+      @case ('qr') { <wallet-qr-payments (pay)="useQr($event)" /> }
       @case ('notifications') {
         <div class="space-y-3">
           <p class="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{{ unread() ? 'You have unread notifications.' : 'You’re all caught up.' }}</p>
           @if (lastNotification(); as transaction) {
-            <p class="rounded-xl border border-slate-200 p-3 text-sm"><strong>{{ transaction.category }}</strong><br><span class="text-slate-600">{{ transaction.name }} · MMK {{ money(transaction.amount) }}</span></p>
+            <p class="rounded-xl border border-slate-200 p-3 text-sm"><strong>{{ transaction.category }}</strong><br><span class="text-slate-600">{{ transaction.name }} · {{ currency() }} {{ money(transaction.amount) }}</span></p>
           }
           <p class="rounded-xl border border-slate-200 p-3 text-sm"><strong>Wallet ready</strong><br><span class="text-slate-600">Your demo wallet is ready to explore.</span></p>
           @if (unread()) { <button type="button" class="primary w-full" (click)="markRead()">Mark all as read</button> }
@@ -303,6 +405,16 @@
     }
   </div>
 </dialog>
+
+<ng-template #receiptActions let-transaction>
+  @if (transaction.detail) { <p role="status" class="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{{ transaction.detail }}</p> }
+  @if (refreshError()) { <p role="alert" class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ refreshError() }}</p> }
+  @if (transaction.status === 'Pending' && transaction.transferId) {
+    <button type="button" class="primary mt-5 w-full" [disabled]="busy()" (click)="refreshTransferStatus()">{{ busy() ? 'Checking…' : 'Check transfer status' }}</button>
+  } @else if (transaction.status === undefined || transaction.status === 'Completed') {
+    <button type="button" class="primary mt-5 w-full" [disabled]="busy()" (click)="saveStatement(transaction)"><svg lucideIcon="download" [size]="16" aria-hidden="true" /> Download receipt</button>
+  }
+</ng-template>
 
 @if (notice()) {
   <div role="status" class="fixed right-4 bottom-23 z-30 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg lg:bottom-5">{{ notice() }}</div>

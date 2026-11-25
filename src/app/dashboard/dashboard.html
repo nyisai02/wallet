@@ -11,19 +11,19 @@
       </button>
     </div>
     <p class="mt-2 flex items-baseline gap-2">
-      <span class="text-sm font-medium text-blue-100">MMK</span>
+      <span class="text-sm font-medium text-blue-100">{{ currency() }}</span>
       <strong class="text-[1.95rem] font-bold tracking-tight tabular-nums sm:text-[2.5rem]">{{ hideBalance() ? '••••••' : money(wallet().balance) }}</strong>
     </p>
     <div class="mt-3 flex items-center justify-between text-xs text-blue-100">
-      <span>Main wallet</span><span class="flex items-center gap-2">•••• {{ account.cardSuffix }} <svg lucideIcon="wallet" [size]="15" aria-hidden="true" /></span>
+      <span>Main wallet</span><span class="flex items-center gap-2">•••• {{ account().cardSuffix }} <svg lucideIcon="wallet" [size]="15" aria-hidden="true" /></span>
     </div>
-    <div class="mt-6 grid grid-cols-4 gap-1 border-t border-white/18 pt-4">
-      @for (item of quickActions; track item.action) {
+    <div class="mt-6 grid gap-1 border-t border-white/18 pt-4" [class]="connected() ? 'grid-cols-3' : 'grid-cols-4'">
+      @for (item of quickActions(); track item.action) {
         <button type="button" class="group flex flex-col items-center gap-2 rounded-lg py-1 text-xs font-medium" (click)="actionRequested.emit({ action: item.action })">
           <span class="grid size-10 place-items-center rounded-xl bg-white/16 transition group-hover:bg-white/30">
             <svg [lucideIcon]="item.icon" [size]="18" aria-hidden="true" />
           </span>
-          {{ item.title }}
+          {{ connected() && item.action === 'topUp' ? 'Deposit' : item.title }}
         </button>
       }
     </div>
@@ -39,18 +39,18 @@
       </select>
     </div>
     <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs">
-      <p class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-blue-600"></span> Money in <b>MMK {{ money(flow().incoming) }}</b></p>
-      <p class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-blue-200"></span> Money out <b>MMK {{ money(flow().outgoing) }}</b></p>
+      <p class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-blue-600"></span> Money in <b>{{ currency() }} {{ money(flow().incoming) }}</b></p>
+      <p class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-blue-200"></span> Money out <b>{{ currency() }} {{ money(flow().outgoing) }}</b></p>
     </div>
     <div class="mt-4 flex h-33 gap-1 border-b border-slate-100" aria-label="Cash flow by day">
       @for (bar of flow().bars; track bar.label) {
-        <div class="group flex min-w-0 flex-1 flex-col text-center" [title]="bar.label + ' · In MMK ' + money(bar.incoming) + ' · Out MMK ' + money(bar.outgoing)">
+        <div class="group flex min-w-0 flex-1 flex-col text-center" [title]="bar.label + ' · In ' + currency() + ' ' + money(bar.incoming) + ' · Out ' + currency() + ' ' + money(bar.outgoing)">
           <div class="flex min-h-0 flex-1 items-end justify-center gap-1 border-b border-slate-100" aria-hidden="true">
             <span class="w-[28%] max-w-4 rounded-t bg-blue-600" [style.height.%]="bar.incomingHeight"></span>
             <span class="w-[28%] max-w-4 rounded-t bg-blue-200" [style.height.%]="bar.outgoingHeight"></span>
           </div>
           <span class="shrink-0 truncate py-2 text-[0.65rem] text-slate-500">{{ bar.label }}</span>
-          <span class="sr-only">Money in MMK {{ money(bar.incoming) }}. Money out MMK {{ money(bar.outgoing) }}.</span>
+          <span class="sr-only">Money in {{ currency() }} {{ money(bar.incoming) }}. Money out {{ currency() }} {{ money(bar.outgoing) }}.</span>
         </div>
       }
     </div>
@@ -67,7 +67,8 @@
     </div>
     <wallet-transaction-list [rows]="recentTransactions()" (transactionSelected)="transactionSelected.emit($event)" />
   </section>
-  <section class="panel">
+  @if (!connected()) {
+    <section class="panel">
     <div class="mb-4 flex items-center justify-between gap-2">
       <h2 class="section-heading">My cards</h2>
       <button type="button" class="text-button text-xs" (click)="screenRequested.emit('Cards')">
@@ -77,9 +78,18 @@
     <button type="button" class="block w-full rounded-2xl text-left" aria-label="View virtual card" (click)="cardRequested.emit()">
       <wallet-card [frozen]="wallet().frozen" />
     </button>
-  </section>
+    </section>
+  } @else {
+    <section class="panel self-start">
+      <h2 class="section-heading mb-4">QR payments</h2>
+      <button type="button" class="primary w-full" (click)="qrRequested.emit()">
+        <svg lucideIcon="qr-code" [size]="17" aria-hidden="true" /> Scan & pay
+      </button>
+    </section>
+  }
 </div>
 
+@if (!connected()) {
 <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
   <section class="panel">
     <div class="mb-4 flex items-center justify-between gap-2">
@@ -106,3 +116,4 @@
     <wallet-savings-progress [saved]="wallet().savings" />
   </section>
 </div>
+}

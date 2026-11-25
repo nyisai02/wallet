@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, output, signal, viewChild } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, output, signal, viewChild } from '@angular/core'
 import { LucideDynamicIcon } from '@lucide/angular'
 import { download } from '../shared/download'
 import { createQrPayload, readQrPayload, type QrPayment } from './qr-payload'
-import { account, money, parseAmount } from '../wallet/wallet-model'
+import { money, parseAmount } from '../wallet/wallet-model'
+import { parseDemoAmount } from '../wallet/demo-wallet-api'
+import { WalletStore } from '../wallet/wallet-store'
 
 @Component({
   selector: 'wallet-qr-payments',
@@ -18,11 +20,14 @@ export class QrPayments {
   private timer?: ReturnType<typeof setInterval>
   private scanId = 0
 
-  protected readonly account = account
+  private readonly store = inject(WalletStore)
+  protected readonly account = this.store.account
+  protected readonly session = this.store.session
+  protected readonly currency = this.store.currency
   protected readonly money = money
   protected readonly mode = signal<'pay' | 'receive'>('pay')
   protected readonly amount = signal('')
-  protected readonly parsedAmount = computed(() => parseAmount(this.amount()))
+  protected readonly parsedAmount = computed(() => this.session() ? parseDemoAmount(this.amount()) : parseAmount(this.amount()))
   protected readonly validAmount = computed(() => this.amount().trim() === '' || this.parsedAmount() !== null)
   protected readonly state = signal<'idle' | 'starting' | 'camera' | 'image'>('idle')
   protected readonly error = signal('')
@@ -38,7 +43,7 @@ export class QrPayments {
       const amount = this.amount()
       this.svg.set('')
       if (amount.trim() && !this.validAmount()) return
-      const payload = createQrPayload(this.parsedAmount())
+      const payload = createQrPayload(this.parsedAmount(), this.session())
       let current = true
       onCleanup(() => { current = false })
 
@@ -76,10 +81,10 @@ export class QrPayments {
 
   protected async copyAccount(): Promise<void> {
     try {
-      await navigator.clipboard.writeText(account.number)
-      this.status.set('Demo account number copied.')
+      await navigator.clipboard.writeText(this.account().number)
+      this.status.set('Wallet identifier copied.')
     } catch {
-      this.status.set('Demo account number: ' + account.number)
+      this.status.set(this.account().number)
     }
   }
 
@@ -190,8 +195,14 @@ export class QrPayments {
   private accept(value: string): void {
     this.stop()
     const payment = readQrPayload(value)
-    if (payment) this.pay.emit(payment)
-    else this.error.set('This QR code is unsupported. Choose a code created with QR to receive.')
+    const session = this.session()
+    if (session && (!payment?.provider || payment.currency !== session.currency || payment.hub !== session.hub)) {
+      this.error.set('Choose an external Demo Wallet QR for ' + session.hub + ' and ' + session.currency + '.')
+    } else if (payment && (session || !payment.provider)) {
+      this.pay.emit(payment)
+    } else {
+      this.error.set('This QR code is unsupported. Choose a MyBank preview QR.')
+    }
   }
 
   private createScanSurface() {

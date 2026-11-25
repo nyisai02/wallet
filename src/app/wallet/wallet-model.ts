@@ -5,6 +5,9 @@ export interface Transaction {
   date: number
   amount: number
   icon: string
+  currency?: string
+  reference?: string | null
+  status?: 'Pending' | 'Completed' | 'Failed'
 }
 
 export interface Wallet {
@@ -51,7 +54,7 @@ export type PostResult = { wallet: Wallet; transaction: Transaction } | { error:
 export const savingsTarget = 1_200_000
 export const savingsName = 'New laptop'
 
-const moneyFormatter = new Intl.NumberFormat('en-US')
+const moneyFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 })
 const dateFormatter = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 const weekdayFormatter = new Intl.DateTimeFormat('en', { weekday: 'short' })
 
@@ -143,7 +146,7 @@ export function filterTransactions(transactions: Transaction[], query: string, d
   const normalized = query.trim().toLowerCase()
   return transactions.filter((transaction) =>
     (direction === 'all' || (direction === 'in' ? transaction.amount > 0 : transaction.amount < 0)) &&
-    [transaction.name, transaction.category, transaction.id].some((value) => value.toLowerCase().includes(normalized)),
+    [transaction.name, transaction.category, transactionReference(transaction) ?? ''].some((value) => value.toLowerCase().includes(normalized)),
   )
 }
 
@@ -184,11 +187,23 @@ export function cashFlow(transactions: Transaction[], days: 7 | 30) {
   }
 }
 
-export function transactionCsv(transactions: Transaction[]): string {
-  const document = transactions.map((transaction) => {
-    // Escape spreadsheet formulas in the user-editable description.
-    const name = /^[\s]*[=+\-@]/.test(transaction.name) ? "'" + transaction.name : transaction.name
-    return [transaction.id, '"' + name.replaceAll('"', '""') + '"', '"' + transactionDate(transaction.date) + '"', transaction.amount, 'Completed'].join(',')
-  })
-  return ['Reference,Description,Date,Amount MMK,Status', ...document].join('\r\n')
+export function transactionCsv(transactions: Transaction[], currency = 'MMK'): string {
+  const document = transactions.map(transaction => [
+    csvField(transactionReference(transaction) ?? ''),
+    csvField(transaction.name),
+    csvField(transactionDate(transaction.date)),
+    transaction.amount,
+    transaction.status ?? 'Completed',
+  ].join(','))
+  return ['Reference,Description,Date,Amount ' + currency + ',Status', ...document].join('\r\n')
+}
+
+function csvField(value: string): string {
+  // Prevent spreadsheet formulas in descriptions and API references.
+  const text = /^\s*[=+\-@]/.test(value) ? "'" + value : value
+  return '"' + text.replaceAll('"', '""') + '"'
+}
+
+export function transactionReference(transaction: Transaction): string | null {
+  return transaction.reference === undefined ? transaction.id : transaction.reference
 }

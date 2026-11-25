@@ -19,7 +19,7 @@
             </td>
             <td class="py-2.5 pr-2 text-xs whitespace-nowrap text-slate-600">{{ transactionDate(row.date) }}</td>
             <td class="py-2.5 text-right text-xs font-semibold whitespace-nowrap tabular-nums" [class.text-emerald-700]="row.amount > 0">
-              {{ row.amount > 0 ? '+' : '−' }} MMK {{ money(row.amount) }}
+              {{ row.amount > 0 ? '+' : '−' }} {{ row.currency ?? 'MMK' }} {{ money(row.amount) }}
             </td>
           </tr>
         }
